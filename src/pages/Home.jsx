@@ -1,29 +1,58 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import BirthForm from "../components/BirthForm";
 import { getCoordinatesByCity } from "../api/geocode";
 import { getTimezoneByCoords } from "../api/timezone";
 import { calculatePlanets } from "../utils/calculatePlanets";
 import { motion, AnimatePresence } from "framer-motion";
 import NatalChart from "../components/NatalChart";
+import DetailedInterpretation from "../components/DetailedInterpretation";
 
 export default function Home() {
   const [result, setResult] = useState(null);
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const resultRef = useRef(null);
+
+  // Эффект для прокрутки к результатам
+  useEffect(() => {
+    if (result && resultRef.current) {
+      resultRef.current.scrollIntoView({ 
+        behavior: 'smooth',
+        block: 'start'
+      });
+    }
+  }, [result]);
 
   const handleFormSubmit = async (formData) => {
     try {
       setIsLoading(true);
       setError("");
 
+      console.log('Form data:', formData); // Отладочный вывод
+
+      // Проверяем и форматируем дату
+      if (!formData.birthDate || !formData.birthTime) {
+        throw new Error('Необходимо указать дату и время рождения');
+      }
+
       const coords = await getCoordinatesByCity(formData.birthPlace);
+      console.log('Coordinates:', coords); // Отладочный вывод
+
       const timezoneData = await getTimezoneByCoords(coords.latitude, coords.longitude);
-      const planetData = await calculatePlanets({
+      console.log('Timezone data:', timezoneData); // Отладочный вывод
+
+      // Форматируем данные для расчета
+      const calculationData = {
         date: formData.birthDate,
         time: formData.birthTime,
-        latitude: coords.latitude,
-        longitude: coords.longitude,
-      });
+        latitude: Number(coords.latitude),
+        longitude: Number(coords.longitude),
+      };
+
+      console.log('Calculation data:', calculationData); // Отладочный вывод
+
+      const planetData = await calculatePlanets(calculationData);
+      console.log('Planet data:', planetData); // Отладочный вывод
       
       const combined = {
         ...formData,
@@ -32,8 +61,11 @@ export default function Home() {
         ...planetData
       };
 
+      console.log('Combined result:', combined); // Отладочный вывод
+
       setResult(combined);
     } catch (err) {
+      console.error('Error in form submission:', err); // Отладочный вывод
       setError(err.message);
     } finally {
       setIsLoading(false);
@@ -58,103 +90,102 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50">
-      <div className="container mx-auto px-4 py-12">
-        <motion.div
+      {/* Декоративные элементы */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute -top-1/2 -left-1/2 w-full h-full bg-gradient-to-br from-indigo-200/20 to-transparent rounded-full blur-3xl" />
+        <div className="absolute -bottom-1/2 -right-1/2 w-full h-full bg-gradient-to-tl from-purple-200/20 to-transparent rounded-full blur-3xl" />
+      </div>
+
+      <div className="relative">
+        {/* Шапка */}
+        <motion.header 
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-          className="text-center mb-12"
+          className="container mx-auto px-4 py-8 sm:py-12 text-center"
         >
-          <h1 className="text-4xl md:text-5xl font-bold text-indigo-800 mb-4">
-            🌟 Натальная Карта
-          </h1>
-          <p className="text-indigo-600/70 text-lg max-w-2xl mx-auto">
-            Узнайте расположение планет в момент вашего рождения и раскройте тайны своей судьбы
-          </p>
-        </motion.div>
+          <motion.h1 
+            className="text-4xl sm:text-5xl md:text-6xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-900 to-purple-900 mb-4 sm:mb-6 leading-tight"
+            initial={{ scale: 0.9 }}
+            animate={{ scale: 1 }}
+            transition={{ type: "spring", stiffness: 200, damping: 10 }}
+          >
+            Натальная карта
+          </motion.h1>
+          <motion.p 
+            className="text-lg sm:text-xl text-indigo-700/70 max-w-2xl mx-auto px-4"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+          >
+            Раскройте тайны своей судьбы через положение звезд в момент вашего рождения
+          </motion.p>
+        </motion.header>
 
-        <div className="grid md:grid-cols-2 gap-8 items-start">
-          <div>
-            <BirthForm onSubmit={handleFormSubmit} />
-          </div>
-
-          <div>
-            <AnimatePresence mode="wait">
-              {isLoading && (
-                <motion.div
-                  key="loading"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="flex items-center justify-center p-12"
-                >
-                  <div className="w-16 h-16 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
-                </motion.div>
-              )}
-
+        {/* Основной контент */}
+        <main className="container mx-auto px-4 pb-12 sm:pb-16">
+          <div className="max-w-7xl mx-auto space-y-8 sm:space-y-12">
+            {/* Форма */}
+            <div className="w-full max-w-md mx-auto">
+              <BirthForm onSubmit={handleFormSubmit} isLoading={isLoading} />
+              
+              <AnimatePresence>
               {error && (
                 <motion.div
-                  key="error"
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.9 }}
-                  className="bg-red-50 border-l-4 border-red-500 p-4 rounded-lg"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -20 }}
+                    className="mt-6 p-4 sm:p-6 bg-red-50/80 backdrop-blur-sm border border-red-200 rounded-xl sm:rounded-2xl"
                 >
-                  <div className="flex items-center">
-                    <div className="flex-shrink-0">⚠️</div>
-                    <div className="ml-3">
-                      <p className="text-red-700">{error}</p>
+                    <div className="flex items-center gap-3">
+                      <span className="text-xl sm:text-2xl">⚠️</span>
+                      <div>
+                        <h4 className="font-semibold text-red-900">Произошла ошибка</h4>
+                        <p className="text-sm sm:text-base text-red-700">{error}</p>
                     </div>
                   </div>
                 </motion.div>
               )}
+              </AnimatePresence>
+            </div>
 
-              {result && !isLoading && (
+            {/* Результаты */}
+            <AnimatePresence mode="wait">
+              {result && (
                 <motion.div
-                  key="result"
-                  initial={{ opacity: 0, y: 20 }}
+                  ref={resultRef}
+                  key="results"
+                  initial={{ opacity: 0, y: 40 }}
                   animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -20 }}
-                  className="bg-white/80 backdrop-blur-md shadow-xl rounded-3xl p-8 border border-indigo-100"
+                  exit={{ opacity: 0, y: -40 }}
+                  transition={{ type: "spring", stiffness: 100, damping: 20 }}
+                  className="bg-white/30 backdrop-blur-lg rounded-xl sm:rounded-2xl p-4 sm:p-8 shadow-xl border border-white/20 scroll-mt-4 sm:scroll-mt-8"
                 >
-                  <div className="relative overflow-hidden">
-                    <div className="absolute -top-10 -left-10 w-32 h-32 bg-indigo-300 opacity-20 rounded-full filter blur-3xl"></div>
-                    <div className="absolute -bottom-10 -right-10 w-32 h-32 bg-pink-300 opacity-20 rounded-full filter blur-3xl"></div>
-
-                    <div className="mb-6">
-                      <h3 className="text-xl font-bold text-indigo-800 text-center">
-                        Натальная карта для {result.name}
-                      </h3>
-                      <p className="text-center text-indigo-600/70 mt-2">
-                        {new Date(result.birthDate).toLocaleDateString('ru-RU', { 
-                          day: 'numeric', 
-                          month: 'long', 
-                          year: 'numeric' 
-                        })}
-                        {' '}в{' '}
-                        {result.birthTime}
-                      </p>
-                    </div>
-
                     <NatalChart data={result} />
-
-                    <div className="mt-8 pt-6 border-t border-indigo-100">
-                      <h4 className="text-sm font-semibold mb-2 text-gray-500">
-                        📍 Координаты места рождения
-                      </h4>
-                      <p className="text-sm text-gray-600">
-                        {result.birthPlace} ({result.latitude.toFixed(4)}°, {result.longitude.toFixed(4)}°)
-                      </p>
-                      <p className="text-sm text-gray-600 mt-1">
-                        Часовой пояс: {result.timezone}
-                      </p>
-                    </div>
+                  <div className="mt-8 sm:mt-12">
+                    <DetailedInterpretation data={result} />
                   </div>
                 </motion.div>
               )}
             </AnimatePresence>
           </div>
+        </main>
+
+        {/* Подвал */}
+        <motion.footer 
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.5 }}
+          className="container mx-auto px-4 py-6 sm:py-8 mt-8 sm:mt-12 border-t border-indigo-100"
+        >
+          <div className="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-4 text-indigo-600/70">
+            <p className="text-sm sm:text-base text-center sm:text-left">© 2024 Натальная карта. Все права защищены.</p>
+            <div className="flex flex-wrap justify-center sm:justify-end items-center gap-4 sm:gap-6 text-sm sm:text-base">
+              <a href="#" className="hover:text-indigo-900 transition-colors px-2 py-1">О проекте</a>
+              <a href="#" className="hover:text-indigo-900 transition-colors px-2 py-1">Конфиденциальность</a>
+              <a href="#" className="hover:text-indigo-900 transition-colors px-2 py-1">Контакты</a>
+          </div>
         </div>
+        </motion.footer>
       </div>
     </div>
   );
