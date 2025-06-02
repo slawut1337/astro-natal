@@ -211,17 +211,17 @@ export default function PersonalityInterpretation({ data }) {
 
   return (
     <motion.div 
-      className="max-w-4xl mx-auto mt-12 space-y-8"
+      className="w-full max-w-4xl mx-auto mt-8 px-4 sm:px-6 lg:px-8 space-y-8"
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}
     >
-      <h2 className="text-2xl font-bold text-indigo-900 text-center mb-8">
+      <h2 className="text-xl sm:text-2xl font-bold text-indigo-900 text-center mb-6 sm:mb-8">
         Интерпретация натальной карты
       </h2>
 
       {/* Основные планеты */}
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="grid gap-4 sm:gap-6 md:grid-cols-2">
         {Object.entries(data.planets).map(([planet, position]) => {
           const sign = getZodiacSign(position.longitude);
           const interpretation = interpretations[planet]?.[sign];
@@ -229,31 +229,31 @@ export default function PersonalityInterpretation({ data }) {
           return (
             <motion.div
               key={planet}
-              className="bg-white/50 backdrop-blur-sm rounded-xl p-6 shadow-md border border-indigo-50"
+              className="bg-white/50 backdrop-blur-sm rounded-xl p-4 sm:p-6 shadow-md border border-indigo-50"
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               whileHover={{ scale: 1.02 }}
               transition={{ duration: 0.2 }}
             >
-              <div className="flex items-center gap-3 mb-4">
+              <div className="flex items-center gap-3 mb-3 sm:mb-4">
                 <div 
-                  className="w-10 h-10 rounded-full flex items-center justify-center border-2"
+                  className="w-8 sm:w-10 h-8 sm:h-10 rounded-full flex items-center justify-center border-2"
                   style={{ borderColor: planetColors[planet] }}
                 >
                   <span 
-                    className="text-xl"
+                    className="text-lg sm:text-xl"
                     style={{ color: planetColors[planet] }}
                   >
                     {planetSymbols[planet]}
                   </span>
                 </div>
                 <div>
-                  <h3 className="text-lg font-semibold text-indigo-900">{planet}</h3>
-                  <p className="text-indigo-600/70">{sign} {Math.round(position.longitude)}°</p>
+                  <h3 className="text-base sm:text-lg font-semibold text-indigo-900">{planet}</h3>
+                  <p className="text-sm sm:text-base text-indigo-600/70">{sign} {Math.round(position.longitude)}°</p>
                 </div>
               </div>
               {interpretation && (
-                <p className="text-indigo-900/80 leading-relaxed">
+                <p className="text-sm sm:text-base text-indigo-900/80 leading-relaxed">
                   {interpretation}
                 </p>
               )}
@@ -264,11 +264,11 @@ export default function PersonalityInterpretation({ data }) {
 
       {/* Аспекты */}
       {data.aspects && data.aspects.length > 0 && (
-        <div className="mt-12">
-          <h3 className="text-xl font-bold text-indigo-900 mb-6 text-center">
+        <div className="mt-8 sm:mt-12">
+          <h3 className="text-lg sm:text-xl font-bold text-indigo-900 mb-4 sm:mb-6 text-center">
             Взаимодействие планет
           </h3>
-          <div className="grid gap-6 md:grid-cols-2">
+          <div className="grid gap-4 sm:gap-6 md:grid-cols-2">
             {data.aspects.map((aspect, index) => {
               const aspectKey = `${aspect.planet1}-${aspect.planet2}`;
               const interpretation = aspectInterpretations[aspect.aspect]?.[aspectKey];
@@ -276,32 +276,32 @@ export default function PersonalityInterpretation({ data }) {
               return (
                 <motion.div
                   key={index}
-                  className="bg-white/50 backdrop-blur-sm rounded-xl p-6 shadow-md border border-indigo-50"
+                  className="bg-white/50 backdrop-blur-sm rounded-xl p-4 sm:p-6 shadow-md border border-indigo-50"
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   whileHover={{ scale: 1.02 }}
                   transition={{ duration: 0.2 }}
                 >
-                  <div className="flex items-center gap-4 mb-4">
+                  <div className="flex items-center gap-3 mb-3 sm:mb-4">
                     <div className="flex items-center gap-2">
                       <span 
-                        className="w-8 h-8 rounded-full flex items-center justify-center border-2"
+                        className="w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center border-2 text-sm sm:text-base"
                         style={{ borderColor: planetColors[aspect.planet1] }}
                       >
                         {planetSymbols[aspect.planet1]}
                       </span>
-                      <span className="text-indigo-600/70">●</span>
+                      <span className="text-indigo-600/70 text-sm sm:text-base">●</span>
                       <span 
-                        className="w-8 h-8 rounded-full flex items-center justify-center border-2"
+                        className="w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center border-2 text-sm sm:text-base"
                         style={{ borderColor: planetColors[aspect.planet2] }}
                       >
                         {planetSymbols[aspect.planet2]}
                       </span>
                     </div>
-                    <span className="text-indigo-900 font-medium">{aspect.aspect}</span>
+                    <span className="text-sm sm:text-base text-indigo-900 font-medium">{aspect.aspect}</span>
                   </div>
                   {interpretation && (
-                    <p className="text-indigo-900/80 leading-relaxed">
+                    <p className="text-sm sm:text-base text-indigo-900/80 leading-relaxed">
                       {interpretation}
                     </p>
                   )}

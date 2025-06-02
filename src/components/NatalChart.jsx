@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import DetailedInterpretation from "./DetailedInterpretation";
 import AspectInterpretation from "./AspectInterpretation";
@@ -45,7 +45,8 @@ const aspectColors = {
   "соединение": "rgba(147, 51, 234, 0.3)",  // Фиолетовый
   "трин": "rgba(16, 185, 129, 0.3)",        // Зеленый
   "квадрат": "rgba(239, 68, 68, 0.3)",      // Красный
-  "оппозиция": "rgba(245, 158, 11, 0.3)"    // Оранжевый
+  "оппозиция": "rgba(245, 158, 11, 0.3)",    // Оранжевый
+  "секстиль": "rgba(59, 130, 246, 0.3)"     // Голубой
 };
 
 export const planetColors = {
@@ -69,10 +70,79 @@ export const planetSymbols = {
 };
 
 export default function NatalChart({ data }) {
-  console.log("NatalChart получил данные:", data);
+  const [selectedPlanet, setSelectedPlanet] = useState(null);
+  const [selectedAspect, setSelectedAspect] = useState(null);
+  const chartRef = useRef(null);
+  
+  // Функция для получения знака зодиака по градусу
+  const getZodiacSign = (degree) => {
+    const normalizedDegree = ((degree % 360) + 360) % 360;
+    const signIndex = Math.floor(normalizedDegree / 30);
+    return zodiacSigns[signIndex];
+  };
+
+  // Функция для расчета позиции на круге
+  const calculatePosition = (degree, radius = 150) => {
+    // Нормализуем градус и переводим в радианы
+    const normalizedDegree = ((degree % 360) + 360) % 360;
+    const angleInRadians = ((normalizedDegree - 90) * Math.PI) / 180;
+    
+    // Рассчитываем позицию
+    return {
+      x: 200 + radius * Math.cos(angleInRadians),
+      y: 200 + radius * Math.sin(angleInRadians)
+    };
+  };
+
+  // Группируем планеты по секторам (30 градусов каждый)
+  const groupPlanetsBySector = (planets) => {
+    if (!planets) return Array(12).fill().map(() => []);
+    
+    const sectors = Array(12).fill().map(() => []);
+    
+    Object.entries(planets).forEach(([planet, data]) => {
+      const normalizedDegree = ((data.longitude % 360) + 360) % 360;
+      const sectorIndex = Math.floor(normalizedDegree / 30);
+      sectors[sectorIndex].push({ planet, degree: normalizedDegree });
+    });
+    
+    return sectors;
+  };
+
+  // Рассчитываем позиции планет с учетом группировки
+  const calculatePlanetPositions = (planets) => {
+    if (!planets) return {};
+    
+    const sectors = groupPlanetsBySector(planets);
+    const positions = {};
+    
+    sectors.forEach((sector, sectorIndex) => {
+      if (sector.length === 0) return;
+      
+      // Базовый угол для сектора
+      const baseAngle = sectorIndex * 30;
+      
+      // Если в секторе одна планета
+      if (sector.length === 1) {
+        const { planet, degree } = sector[0];
+        positions[planet] = calculatePosition(degree);
+        return;
+      }
+      
+      // Если в секторе несколько планет, распределяем их по радиусу
+      sector.forEach(({ planet, degree }, index) => {
+        const radiusOffset = index * 15; // Смещаем каждую следующую планету на 15 пикселей
+        positions[planet] = calculatePosition(degree, 150 - radiusOffset);
+      });
+    });
+    
+    return positions;
+  };
+
+  // Рассчитываем позиции с помощью useMemo для оптимизации
+  const planetPositions = useMemo(() => calculatePlanetPositions(data?.planets), [data?.planets]);
 
   if (!data || !data.planets) {
-    console.log("Нет данных для отображения натальной карты");
     return (
       <div className="text-indigo-900/80 text-center py-4">
         Загрузка данных натальной карты...
@@ -80,200 +150,189 @@ export default function NatalChart({ data }) {
     );
   }
 
-  const calculatePosition = (degree, radius = 150) => {
-    const angleInRadians = (degree - 90) * (Math.PI / 180);
+  // Функция для отрисовки линии аспекта
+  const renderAspectLine = (pos1, pos2, aspect, isSelected) => {
+    if (!pos1 || !pos2) return null;
+
+    // Рассчитываем вектор между планетами
+    const dx = pos2.x - pos1.x;
+    const dy = pos2.y - pos1.y;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+    
+    // Если планеты слишком близко, не рисуем аспект
+    if (distance < 30) return null;
+
+    // Нормализуем вектор
+    const nx = dx / distance;
+    const ny = dy / distance;
+    
+    // Отступаем от центров планет
+    const offset = 20;
+    const startX = pos1.x + nx * offset;
+    const startY = pos1.y + ny * offset;
+    const endX = pos2.x - nx * offset;
+    const endY = pos2.y - ny * offset;
+
     return {
-      x: radius * Math.cos(angleInRadians) + 200,
-      y: radius * Math.sin(angleInRadians) + 200
+      x1: startX,
+      y1: startY,
+      x2: endX,
+      y2: endY
     };
   };
 
   return (
-    <div className="space-y-8">
-      <div className="text-center mb-8">
-        <motion.h2 
-          className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-900 to-purple-900 mb-2"
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-        >
-          Натальная карта
-        </motion.h2>
-        <motion.p 
-          className="text-indigo-600/70"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.2 }}
-        >
-          {data.name}, {new Date(data.birthDate).toLocaleDateString('ru-RU')} в {data.birthTime}
-        </motion.p>
-      </div>
+    <div className="relative w-[400px] h-[400px] mx-auto bg-white/5 backdrop-blur-sm rounded-full p-4" ref={chartRef}>
+      <svg className="absolute inset-0" viewBox="0 0 400 400">
+        {/* Основной круг */}
+        <circle
+          cx="200"
+          cy="200"
+          r="180"
+          fill="none"
+          stroke="rgba(79, 70, 229, 0.1)"
+          strokeWidth="1"
+        />
+        <circle
+          cx="200"
+          cy="200"
+          r="150"
+          fill="none"
+          stroke="rgba(79, 70, 229, 0.1)"
+          strokeWidth="1"
+        />
 
-      <div className="relative w-[400px] h-[400px] mx-auto bg-white/50 backdrop-blur-sm rounded-full shadow-lg border border-indigo-100">
-        <svg className="absolute inset-0" viewBox="0 0 400 400">
-          {/* Основной круг */}
-          <circle
-            cx="200"
-            cy="200"
-            r="180"
-            fill="none"
-            stroke="rgba(79, 70, 229, 0.1)"
-            strokeWidth="1"
-          />
-          <circle
-            cx="200"
-            cy="200"
-            r="150"
-            fill="none"
-            stroke="rgba(79, 70, 229, 0.1)"
-            strokeWidth="1"
-          />
-
-          {/* Знаки зодиака */}
-          {Array.from({ length: 12 }).map((_, i) => {
-            const angle = i * 30;
-            const outerPos = calculatePosition(angle, 165);
-            const lineEnd = calculatePosition(angle, 180);
-            return (
-              <g key={`zodiac-${i}`}>
-                <line
-                  x1="200"
-                  y1="200"
-                  x2={lineEnd.x}
-                  y2={lineEnd.y}
-                  stroke="rgba(79, 70, 229, 0.1)"
-                  strokeWidth="1"
-                />
-                <text
-                  x={outerPos.x}
-                  y={outerPos.y}
-                  textAnchor="middle"
-                  dominantBaseline="middle"
-                  className="fill-indigo-900/60 text-[14px]"
-                >
-                  {zodiacSigns[i]}
-                </text>
-              </g>
-            );
-          })}
-
-          {/* Аспекты */}
-          {data.aspects && data.aspects.map((aspect, index) => {
-            const pos1 = calculatePosition(data.planets[aspect.planet1].longitude, 150);
-            const pos2 = calculatePosition(data.planets[aspect.planet2].longitude, 150);
-            return (
-              <motion.line
-                key={`aspect-${index}`}
-                x1={pos1.x}
-                y1={pos1.y}
-                x2={pos2.x}
-                y2={pos2.y}
-                stroke={aspectColors[aspect.aspect]}
-                strokeWidth="2"
-                initial={{ pathLength: 0, opacity: 0 }}
-                animate={{ pathLength: 1, opacity: 1 }}
-                transition={{ duration: 1, delay: 0.5 + index * 0.1 }}
-              />
-            );
-          })}
-        </svg>
-
-        {/* Планеты */}
-        {Object.entries(data.planets).map(([planet, position]) => {
-          const pos = calculatePosition(position.longitude, 150);
+        {/* Сектора знаков зодиака */}
+        {Array.from({ length: 12 }).map((_, i) => {
+          const startAngle = i * 30;
+          const endAngle = (i + 1) * 30;
+          const startPos = calculatePosition(startAngle, 180);
+          const midPos = calculatePosition(startAngle + 15, 165);
+          
           return (
-            <motion.div
-              key={planet}
-              className="absolute w-8 h-8 -ml-4 -mt-4 flex items-center justify-center"
-              style={{
-                left: pos.x,
-                top: pos.y
-              }}
-              initial={{ opacity: 0, scale: 0 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.5, delay: 0.3 }}
-            >
-              <div className="relative group">
-                <div 
-                  className="w-8 h-8 rounded-full flex items-center justify-center bg-white shadow-md border-2 transition-transform transform-gpu group-hover:scale-110"
-                  style={{ borderColor: planetColors[planet] }}
-                >
-                  <span 
-                    className="text-lg font-bold"
-                    style={{ color: planetColors[planet] }}
-                  >
-                    {planetSymbols[planet]}
-                  </span>
-                </div>
-                <div className="absolute -bottom-6 left-1/2 transform -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity bg-white px-2 py-1 rounded-md shadow-sm text-xs whitespace-nowrap">
-                  {planet} {Math.round(position.longitude)}°
-                </div>
-              </div>
-            </motion.div>
+            <g key={`zodiac-${i}`}>
+              <line
+                x1="200"
+                y1="200"
+                x2={startPos.x}
+                y2={startPos.y}
+                stroke="rgba(79, 70, 229, 0.1)"
+                strokeWidth="1"
+              />
+              <text
+                x={midPos.x}
+                y={midPos.y}
+                textAnchor="middle"
+                dominantBaseline="middle"
+                className="fill-indigo-900/60 text-[14px]"
+              >
+                {zodiacSigns[i]}
+              </text>
+            </g>
           );
         })}
-      </div>
 
-      <div className="grid grid-cols-2 gap-8 max-w-2xl mx-auto mt-12">
-        <motion.div 
-          className="bg-white/50 backdrop-blur-sm rounded-xl p-6 shadow-md border border-indigo-50"
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-        >
-          <h4 className="text-lg font-medium text-indigo-900 mb-4">Положение планет</h4>
-          <div className="space-y-3">
-            {Object.entries(data.planets).map(([planet, position]) => (
-              <div key={planet} className="flex items-center gap-3 p-2 rounded-lg hover:bg-white/50 transition-colors">
-                <div 
-                  className="w-8 h-8 rounded-full flex items-center justify-center border-2"
-                  style={{ borderColor: planetColors[planet], color: planetColors[planet] }}
+        {/* Аспекты */}
+        {data.aspects && data.aspects.map((aspect, index) => {
+          const pos1 = planetPositions[aspect.planet1];
+          const pos2 = planetPositions[aspect.planet2];
+          const isSelected = selectedAspect === index;
+          
+          const lineCoords = renderAspectLine(pos1, pos2, aspect.aspect, isSelected);
+          if (!lineCoords) return null;
+          
+          return (
+            <motion.line
+              key={`aspect-${index}`}
+              {...lineCoords}
+              stroke={aspectColors[aspect.aspect]}
+              strokeWidth={isSelected ? "3" : "2"}
+              initial={{ pathLength: 0, opacity: 0 }}
+              animate={{ 
+                pathLength: 1, 
+                opacity: isSelected ? 0.8 : 0.4,
+                strokeWidth: isSelected ? 3 : 2
+              }}
+              transition={{ duration: 1, delay: 0.5 + index * 0.1 }}
+              onMouseEnter={() => setSelectedAspect(index)}
+              onMouseLeave={() => setSelectedAspect(null)}
+              style={{ cursor: "pointer" }}
+            />
+          );
+        })}
+      </svg>
+
+      {/* Планеты */}
+      {Object.entries(data.planets).map(([planet, position]) => {
+        const pos = planetPositions[planet];
+        const isSelected = selectedPlanet === planet;
+        if (!pos) return null;
+
+        return (
+          <motion.div
+            key={planet}
+            className="absolute w-8 h-8 -ml-4 -mt-4 flex items-center justify-center"
+            style={{
+              left: pos.x,
+              top: pos.y,
+              zIndex: isSelected ? 10 : 1
+            }}
+            initial={{ opacity: 0, scale: 0 }}
+            animate={{ 
+              opacity: 1, 
+              scale: isSelected ? 1.2 : 1,
+              filter: `drop-shadow(0 0 ${isSelected ? '8px' : '4px'} ${planetColors[planet]})`
+            }}
+            transition={{ duration: 0.5, delay: 0.3 }}
+            onMouseEnter={() => setSelectedPlanet(planet)}
+            onMouseLeave={() => setSelectedPlanet(null)}
+          >
+            <div className="relative group">
+              <div 
+                className="w-8 h-8 rounded-full flex items-center justify-center bg-white shadow-md border-2 transition-transform transform-gpu hover:scale-110"
+                style={{ borderColor: planetColors[planet] }}
+              >
+                <span 
+                  className="text-lg font-bold"
+                  style={{ color: planetColors[planet] }}
                 >
                   {planetSymbols[planet]}
-                </div>
-                <div>
-                  <div className="text-indigo-900 font-medium">{planet}</div>
-                  <div className="text-indigo-600/70 text-sm">{Math.round(position.longitude)}°</div>
-                </div>
+                </span>
               </div>
-            ))}
-          </div>
-        </motion.div>
-
-        <motion.div 
-          className="bg-white/50 backdrop-blur-sm rounded-xl p-6 shadow-md border border-indigo-50"
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-        >
-          <h4 className="text-lg font-medium text-indigo-900 mb-4">Аспекты</h4>
-          <div className="space-y-3">
-            {data.aspects && data.aspects.map((aspect, index) => (
-              <motion.div
-                key={index}
-                className="flex items-center gap-3 p-2 rounded-lg hover:bg-white/50 transition-colors"
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: index * 0.1 }}
+              <motion.div 
+                className="absolute -bottom-6 left-1/2 transform -translate-x-1/2 bg-white px-2 py-1 rounded-md shadow-sm text-xs whitespace-nowrap"
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: isSelected ? 1 : 0, y: isSelected ? 0 : -10 }}
+                transition={{ duration: 0.2 }}
               >
-                <div className="flex items-center gap-2">
-                  <span 
-                    className="w-8 h-8 rounded-full flex items-center justify-center border-2"
-                    style={{ borderColor: planetColors[aspect.planet1], color: planetColors[aspect.planet1] }}
-                  >
-                    {planetSymbols[aspect.planet1]}
-                  </span>
-                  <span className="text-indigo-600/70">●</span>
-                  <span 
-                    className="w-8 h-8 rounded-full flex items-center justify-center border-2"
-                    style={{ borderColor: planetColors[aspect.planet2], color: planetColors[aspect.planet2] }}
-                  >
-                    {planetSymbols[aspect.planet2]}
-                  </span>
-                </div>
-                <span className="text-indigo-900">{aspect.aspect}</span>
+                {planet} {Math.round(position.longitude)}° {getZodiacSign(position.longitude)}
               </motion.div>
-            ))}
+            </div>
+          </motion.div>
+        );
+      })}
+
+      {/* Информация об аспектах */}
+      {selectedAspect !== null && data.aspects[selectedAspect] && (
+        <motion.div
+          className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-white/90 backdrop-blur-sm px-4 py-2 rounded-lg shadow-lg text-sm"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: 20 }}
+        >
+          <div className="flex items-center gap-2">
+            <span style={{ color: planetColors[data.aspects[selectedAspect].planet1] }}>
+              {planetSymbols[data.aspects[selectedAspect].planet1]}
+            </span>
+            <span className="text-indigo-900">
+              {data.aspects[selectedAspect].aspect}
+            </span>
+            <span style={{ color: planetColors[data.aspects[selectedAspect].planet2] }}>
+              {planetSymbols[data.aspects[selectedAspect].planet2]}
+            </span>
           </div>
         </motion.div>
-      </div>
+      )}
     </div>
   );
 }
